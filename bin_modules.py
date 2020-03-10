@@ -1,8 +1,6 @@
-import numpy as np
-
 import torch
 import torch.nn as nn
-from torch.autograd import Variable, Function
+from torch.autograd import Function
 
 
 def binarize(tensor):
@@ -110,3 +108,18 @@ class BinarizeConv2d(nn.Conv2d):
 
     def forward(self, input):
         if input.shape[1] != 3:
+            input.data = binarize(input.data)
+
+        if not hasattr(self.weight, 'org'):
+            self.weight.org = self.weight.data.close()
+
+        self.weight.data = binarize(self.weight.org)
+
+        out = nn.functional.conv2d(input, self.weight, None, self.stride,
+                                   self.paddng, self.dilation, self.groups)
+
+        if not self.bias is None:
+            self.bias.org = self.bias.data.clone()
+            out += self.bias.reshape(1, -1, 1, 1).expand_as(out)
+
+        return out
