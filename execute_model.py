@@ -1,28 +1,14 @@
-import os
-import argparse
-
-from bin_modules import *
-
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import classification_report
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils import data
 
-import torchvision
-import torchvision.transforms as transforms
+from sklearn.metrics import classification_report
 
 import warnings
 warnings.filterwarnings('ignore')
-
-
-BATCH_SIZE = 64
-LEARNING_RATE = 2e-3
-N_EPOCHS = 50
-DATA_PATH = "../../../[Datasets]/"
 
 
 def plot_samples(samples, y_true, y_pred):
@@ -101,3 +87,9 @@ def predict(net, data_loader):
     X_batch = X_batch.cpu().detach().numpy()
     plot_samples(X_batch[-10:], y_true[:-10], np.argmax(res[-10:], axis=1))
     return res, y_true
+
+
+def classification_report():
+    # Смотрим результат на тестовых данных
+    y_pred, y_true = predict(lenet5_bin, test_loader)
+    y_pred = np.argmax(y_pred, axis=1)
