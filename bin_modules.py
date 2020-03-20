@@ -1,6 +1,10 @@
 import torch
 import torch.nn as nn
 from torch.autograd import Function
+from torchvision.transforms import Normalize
+
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 def binarize(tensor):
@@ -102,21 +106,50 @@ class BinarizedLinear(nn.Linear):
         return out
 
 
-class BinarizeConv2d(nn.Conv2d):
+class QuantizedInput(nn.Module):
+    def __init__(self):
+        super(QuantizedInput, self).__init__()
+        raise NotImplementedError("Слой еще не реализован")
+
+
+class BinarizedInput2d(nn.Module):
+    def __init__(self, percentiles):
+        super(BinarizedInput2d, self).__init__()
+        self.percentiles = percentiles
+
+    def forward(self, x):
+        if len(x.shape) != 4:
+            raise RuntimeError("BinarizedInput layer: Input should have 3 dimensions")
+
+        batch_size, channels, width, height = x.shape
+        new_x = torch.empty([batch_size, channels * len(self.percentiles), width, height]).cuda()
+
+        i = 0
+        for channel in range(channels):
+            for perc in self.percentiles:
+                new_x[:, i, :, :] = (x[:, channel, :, :] > perc)
+                i += 1
+        return new_x
+
+
+class BinarizedConv2d(nn.Conv2d):
     def __init__(self, *args, **kwargs):
-        super(BinarizeConv2d, self).__init__(*args, **kwargs)
+        super(BinarizedConv2d, self).__init__(*args, **kwargs)
 
     def forward(self, input):
+        # Здесь происходит бинаризация входных данных
+        # В том числе и тех данных, которые подаются во входном слое
+        # Из-за этого происходят потеря данных
         if input.shape[1] != 3:
             input.data = binarize(input.data)
 
         if not hasattr(self.weight, 'org'):
-            self.weight.org = self.weight.data.close()
+            self.weight.org = self.weight.data.clone()
 
         self.weight.data = binarize(self.weight.org)
 
         out = nn.functional.conv2d(input, self.weight, None, self.stride,
-                                   self.paddng, self.dilation, self.groups)
+                                   self.padding, self.dilation, self.groups)
 
         if not self.bias is None:
             self.bias.org = self.bias.data.clone()
